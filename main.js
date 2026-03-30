@@ -142,7 +142,14 @@ function setupEventListeners() {
         updateDashboard();
     });
 
-    // Cloud Sync Automático (URL Fixa)
+    // Cloud Sync Automático (Sincronização Manual)
+    const syncUrlInput = document.getElementById('sync-url');
+    syncUrlInput.value = localStorage.getItem('gomez_club_sync_url') || CLOUD_SYNC_URL;
+    
+    syncUrlInput.addEventListener('change', () => {
+        localStorage.setItem('gomez_club_sync_url', syncUrlInput.value.trim());
+    });
+
     document.getElementById('sync-now-btn').addEventListener('click', () => syncWithCloud(false));
 
     // Gerenciar Atendentes
@@ -209,7 +216,8 @@ function removeStaff(index) {
 }
 
 async function syncWithCloud(silent = false) {
-    let url = CLOUD_SYNC_URL;
+    let urlInput = document.getElementById('sync-url');
+    let url = urlInput.value.trim() || CLOUD_SYNC_URL;
     
     if (!url) {
         updateSyncStatus('offline');
