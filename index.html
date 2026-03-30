@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pós-Venda Gomez Club | G3.0</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+</head>
+<body class="dark-theme">
+    <nav class="sidebar">
+        <div class="logo">
+            <span class="logo-text">GOMEZ <span class="highlight">CLUB</span></span>
+        </div>
+        <ul class="nav-links">
+            <li class="active" data-tab="lancamentos">
+                <i class="icon-edit"></i>
+                <span>Lançamentos</span>
+            </li>
+            <li data-tab="dashboard">
+                <i class="icon-dashboard"></i>
+                <span>Dashboard</span>
+            </li>
+            <li class="nav-divider"></li>
+            <li class="settings-group">
+                <label>Nuvem Gomez Club</label>
+                <input type="password" id="sync-url" placeholder="Cole a URL de Sincronização..." class="glass-input small">
+                <button id="sync-now-btn" class="secondary-btn">Sincronizar Agora</button>
+                
+                <label style="margin-top: 1rem;">Equipe</label>
+                <button id="manage-staff-btn" class="secondary-btn">Configurar Atendentes</button>
+                
+                <div id="cloud-status-indicator" class="status-badge offline">
+                    <span class="dot"></span>
+                    <span class="status-text">Desconectado</span>
+                </div>
+            </li>
+        </ul>
+        <div class="user-profile">
+            <div class="avatar">GC</div>
+            <div class="info">
+                <span class="name">Gomez Club</span>
+                <span class="role">Administrador</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header>
+            <h1 id="page-title">Lançamentos de Prospecção</h1>
+            <div class="header-actions">
+                <div class="date-selector">
+                    <input type="month" id="month-filter" class="glass-input">
+                </div>
+                <button id="add-entry-btn" class="primary-btn">Novo Lançamento</button>
+            </div>
+        </header>
+
+        <section id="tab-lancamentos" class="tab-content active">
+            <div class="glass-card table-container">
+                <table id="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Atendente</th>
+                            <th>Tipo de Ação</th>
+                            <th>Mensagens</th>
+                            <th>Agendamentos</th>
+                            <th>Serviços (R$)</th>
+                            <th>Assinaturas (R$)</th>
+                            <th>Venda (R$)</th>
+                            <th>Canc.</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Dados inseridos via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="tab-dashboard" class="tab-content">
+            <div class="kpi-container">
+                <div class="glass-card kpi-card highlight-card">
+                    <span class="kpi-label">Faturamento Total</span>
+                    <span class="kpi-value" id="kpi-revenue">R$ 0,00</span>
+                    <span class="kpi-trend" id="revenue-trend">Soma de tudo</span>
+                </div>
+                <div class="glass-card kpi-card">
+                    <span class="kpi-label">Serviços</span>
+                    <span class="kpi-value" id="kpi-services">R$ 0,00</span>
+                    <span class="kpi-trend" id="services-trend">--</span>
+                </div>
+                <div class="glass-card kpi-card">
+                    <span class="kpi-label">Novas Assinaturas</span>
+                    <span class="kpi-value" id="kpi-subs">R$ 0,00</span>
+                    <span class="kpi-trend" id="subs-trend">--</span>
+                </div>
+                <div class="glass-card kpi-card">
+                    <span class="kpi-label">Venda Produtos</span>
+                    <span class="kpi-value" id="kpi-products">R$ 0,00</span>
+                    <span class="kpi-trend" id="products-trend">--</span>
+                </div>
+                <div class="glass-card kpi-card">
+                    <span class="kpi-label">Agendamentos</span>
+                    <span class="kpi-value" id="kpi-appointments">0</span>
+                    <span class="kpi-trend" id="appointments-trend">--</span>
+                </div>
+                <div class="glass-card kpi-card">
+                    <span class="kpi-label">Taxa de Conversão</span>
+                    <span class="kpi-value" id="kpi-conversion">0%</span>
+                    <span class="kpi-trend positive" id="conversion-trend">--</span>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="glass-card chart-container">
+                    <h3>Performance por Atendente</h3>
+                    <canvas id="barChart"></canvas>
+                </div>
+                <div class="glass-card chart-container">
+                    <h3>Eficiência por Script</h3>
+                    <canvas id="pieChart"></canvas>
+                </div>
+                <div class="glass-card chart-container full-width">
+                    <h3>Evolução de Agendamentos</h3>
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal para Novo Lançamento -->
+    <div id="modal-container" class="modal-overlay">
+        <div class="glass-card modal">
+            <header>
+                <h2>Novo Lançamento</h2>
+                <button class="close-btn">&times;</button>
+            </header>
+            <form id="entry-form">
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="form-date" required class="glass-input">
+                </div>
+                <div class="form-group">
+                    <label>Atendente</label>
+                    <select id="form-attendant" required class="glass-input">
+                        <option value="">Selecione...</option>
+                        <option value="Ana">Ana</option>
+                        <option value="Julia">Julia</option>
+                        <option value="Beatriz">Beatriz</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Ação</label>
+                    <select id="form-action" required class="glass-input">
+                        <option value="">Selecione...</option>
+                        <option value="Aniversariantes">Aniversariantes</option>
+                        <option value="VIP / Combos">VIP / Combos</option>
+                        <option value="Recompra">Recompra</option>
+                        <option value="Venda de Assinatura">Venda de Assinatura</option>
+                        <option value="Cancelamento">Cancelamento</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mensagens Enviadas</label>
+                        <input type="number" id="form-messages" min="0" required class="glass-input" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Agendamentos (Fisgado)</label>
+                        <input type="number" id="form-appointments" min="0" required class="glass-input" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" id="group-services">
+                        <label>Valor Serviços (R$)</label>
+                        <input type="number" id="form-services" step="0.01" min="0" required class="glass-input" value="0">
+                    </div>
+                    <div class="form-group" id="group-subs">
+                        <label>Novas Assinaturas (R$)</label>
+                        <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                            <input type="number" id="form-subs" step="0.01" min="0" required class="glass-input" value="0" placeholder="Valor">
+                            <input type="number" id="form-subs-qtd" min="0" required class="glass-input" value="0" placeholder="Qtd">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" id="group-sales">
+                        <label>Venda Produtos (R$)</label>
+                        <input type="number" id="form-sales" step="0.01" min="0" required class="glass-input" value="0">
+                    </div>
+                    <div class="form-group" id="group-cancellations">
+                        <label>Cancelamentos (Planos)</label>
+                        <input type="number" id="form-cancellations" min="0" required class="glass-input" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="cancel-btn">Cancelar</button>
+                    <button type="submit" class="primary-btn">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Gerenciar Atendentes -->
+    <div id="staff-modal" class="modal-overlay">
+        <div class="glass-card modal">
+            <header>
+                <h2>Gerenciar Equipe</h2>
+                <button class="close-btn" id="close-staff-modal">&times;</button>
+            </header>
+            <div class="form-group">
+                <label>Nova Atendente</label>
+                <div class="form-row">
+                    <input type="text" id="new-staff-name" placeholder="Nome da atendente..." class="glass-input">
+                    <button id="add-staff-btn" class="primary-btn">Adicionar</button>
+                </div>
+            </div>
+            <div class="staff-list-container">
+                <ul id="staff-list" class="dynamic-list">
+                    <!-- Lista de atendentes -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button id="save-staff-btn" class="primary-btn">Concluir</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
