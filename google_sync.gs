@@ -1,49 +1,65 @@
 /**
- * 🚀 PASSO A PASSO PARA CONFIGURAR A NUVEM GOMEZ CLUB:
- * 
- * 1. Crie uma nova Planilha no seu Google Drive.
- * 2. No menu superior, clique em: EXTENSÕES > APPS SCRIPT.
- * 3. Apague todo o código que estiver lá e COLE este código aqui.
- * 4. Clique no ícone de DISQUETE (Salvar) e dê um nome (ex: "Sincronizador Gomez").
- * 5. Clique no botão azul: IMPLANTAR (ou DEPLOY) > NOVA IMPLANTAÇÃO.
- * 6. No ícone de engrenagem, escolha: APP DA WEB.
- * 7. Em "Quem pode acessar", escolha: QUALQUER PESSOA (sem isso não funciona!).
- * 8. Clique em IMPLANTAR. O Google vai pedir para "Autorizar acesso".
- * 9. Clique em "Configurações Avançadas" e depois em "Ir para Sincronizador (não seguro)".
- * 10. No final, copie a URL gerada e cole no seu App Gomez Club.
+ * 🚀 VERSÃO 2.0 - SINCRONIZAÇÃO INTELIGENTE (SEM PERDA DE DADOS)
+ * COPIE TODO ESTE CÓDIGO E COLE NO SEU APPS SCRIPT.
+ * LEMBRE DE: IMPLANTAR > NOVA IMPLANTAÇÃO > APP DA WEB (QUALQUER PESSOA).
  */
 
 function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheets()[0];
   var data;
   
   try {
     data = JSON.parse(e.postData.contents);
   } catch (err) {
-    // Fallback para outros formatos de postData
     data = JSON.parse(e.postData.getDataAsString());
   }
   
-  // Limpa e sobrescreve para manter sincronizado (Simples)
-  sheet.clear();
-  if (data.length > 0) {
-    var headers = Object.keys(data[0]);
-    sheet.appendRow(headers);
-    
-    data.forEach(function(row) {
-      var values = headers.map(function(h) { return row[h]; });
-      sheet.appendRow(values);
-    });
-  }
+  if (!data || data.length === 0) return createResponse({status: "Nada para salvar"}, e);
+
+  // 1. Pega os cabeçalhos (baseado na primeira linha enviada)
+  var headers = Object.keys(data[0]);
   
-  return ContentService.createTextOutput("Sucesso").setMimeType(ContentService.MimeType.TEXT);
+  // 2. Tenta ler o que já existe na planilha
+  var existingContent = sheet.getDataRange().getValues();
+  var sheetHeaders = existingContent.length > 0 ? existingContent[0] : [];
+  
+  // Se a planilha estiver vazia, escreve os cabeçalhos
+  if (sheetHeaders.length === 0) {
+    sheet.appendRow(headers);
+    sheetHeaders = headers;
+  }
+
+  // Mapa de IDs existentes para saber onde atualizar
+  var idMap = {};
+  for (var i = 1; i < existingContent.length; i++) {
+    var rowId = existingContent[i][0]; // Assume que o ID é a PRIMEIRA coluna
+    idMap[rowId] = i + 1; // Guarda o número da linha
+  }
+
+  // 3. Processa cada linha enviada
+  data.forEach(function(item) {
+    var rowValues = headers.map(function(h) { return item[h] || ""; });
+    var itemId = item.id;
+    
+    if (idMap[itemId]) {
+      // Já existe: Atualiza a linha
+      var range = sheet.getRange(idMap[itemId], 1, 1, rowValues.length);
+      range.setValues([rowValues]);
+    } else {
+      // Novo: Adiciona no final
+      sheet.appendRow(rowValues);
+    }
+  });
+  
+  return createResponse({status: "Sucesso", rowsSaved: data.length}, e);
 }
 
 function doGet(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   var rows = sheet.getDataRange().getValues();
   
-  if (rows.length === 0) return createResponse([], e);
+  if (rows.length < 2) return createResponse([], e);
   
   var headers = rows.shift();
   var data = rows.map(function(row) {
@@ -59,8 +75,7 @@ function doGet(e) {
 
 function createResponse(data, e) {
   var result = JSON.stringify(data);
-  if (e.parameter.callback) {
-    // JSONP: Bypasses CORS
+  if (e.parameter && e.parameter.callback) {
     return ContentService.createTextOutput(e.parameter.callback + "(" + result + ")")
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }

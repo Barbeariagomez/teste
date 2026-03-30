@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-const CLOUD_SYNC_URL = 'https://script.google.com/macros/s/AKfycbw8GnORaksuVSZNoSzR6xjrm0BLqGtCJ2M0AyBHwivSxd83CmVWlv38FVgv4fAdKtMyng/exec';
+const CLOUD_SYNC_URL = 'https://script.google.com/macros/s/AKfycbzZVR0fZMZtHmumkTtfJui70b3yNKHAAsE-HOUg3awewRTvr2ZYZ_etmrfztgn998MjHg/exec';
 
 function initApp() {
     const now = new Date();
@@ -30,24 +30,49 @@ function initApp() {
     updateDashboard();
     
     // Auto-sync na inicialização
-    setTimeout(() => syncWithCloud(true), 1500);
+    setTimeout(() => syncWithCloud(true), 1000);
 
-    // Polling Automático: Atualiza os dados da nuvem a cada 2 minutos (120000 ms)
-    setInterval(() => syncWithCloud(true), 120000);
+    // Polling Automático: Atualiza os dados da nuvem a cada 20 segundos
+    setInterval(() => syncWithCloud(true), 20000);
+
+    // Sync quando voltar para a aba (Celular)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            syncWithCloud(true);
+        }
+    });
 }
 
 // Callback Global para JSONP (Túnel de Dados)
 window.handleCloudData = function(data) {
     if (data && Array.isArray(data)) {
-        entries = data.map(e => ({
-            services: 0, subs: 0, subsQtd: 0, cancellations: 0,
+        // MERGE INTELIGENTE: Mantém o que é local e atualiza com o que veio da nuvem
+        const cloudData = data.map(e => ({
+            messages: 0, appointments: 0, services: 0, subs: 0, subsQtd: 0, cancellations: 0,
             ...e
         }));
+
+        // Cria um mapa para busca rápida por ID
+        const entryMap = new Map();
+        
+        // 1. Carrega dados da nuvem (Base de verdade)
+        cloudData.forEach(item => entryMap.set(item.id, item));
+
+        // 2. Mescla com dados locais (O que ainda não subiu)
+        entries.forEach(item => {
+            if (!entryMap.has(item.id)) {
+                entryMap.set(item.id, item);
+            }
+        });
+
+        // 3. Atualiza estado global
+        entries = Array.from(entryMap.values());
         localStorage.setItem('gomez_club_entries', JSON.stringify(entries));
+        
         renderTable();
         updateDashboard();
         updateSyncStatus('online');
-        console.log('Dados recebidos via JSONP.');
+        console.log('Dados sincronizados com sucesso (Nuvem + Local).');
     }
 };
 
