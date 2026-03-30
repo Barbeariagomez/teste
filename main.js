@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
+const CLOUD_SYNC_URL = 'https://script.google.com/macros/s/AKfycbw8GnORaksuVSZNoSzR6xjrm0BLqGtCJ2M0AyBHwivSxd83CmVWlv38FVgv4fAdKtMyng/exec';
+
 function initApp() {
     const now = new Date();
     const currentMonth = now.toISOString().substring(0, 7);
@@ -29,6 +31,9 @@ function initApp() {
     
     // Auto-sync na inicialização
     setTimeout(() => syncWithCloud(true), 1500);
+
+    // Polling Automático: Atualiza os dados da nuvem a cada 2 minutos (120000 ms)
+    setInterval(() => syncWithCloud(true), 120000);
 }
 
 // Callback Global para JSONP (Túnel de Dados)
@@ -112,13 +117,7 @@ function setupEventListeners() {
         updateDashboard();
     });
 
-    // Cloud Sync
-    const syncUrlInput = document.getElementById('sync-url');
-    syncUrlInput.value = localStorage.getItem('gomez_club_sync_url') || '';
-    syncUrlInput.addEventListener('change', () => {
-        localStorage.setItem('gomez_club_sync_url', syncUrlInput.value.trim());
-    });
-
+    // Cloud Sync Automático (URL Fixa)
     document.getElementById('sync-now-btn').addEventListener('click', () => syncWithCloud(false));
 
     // Gerenciar Atendentes
@@ -185,26 +184,10 @@ function removeStaff(index) {
 }
 
 async function syncWithCloud(silent = false) {
-    let urlInput = document.getElementById('sync-url');
-    let url = urlInput.value.trim();
+    let url = CLOUD_SYNC_URL;
     
     if (!url) {
-        if (!silent) alert('Por favor, cole a URL de Sincronização do Google Apps Script.');
         updateSyncStatus('offline');
-        return;
-    }
-
-    // Auto-fix: se não terminar com /exec, mas for um link de script do google
-    if (url.includes('script.google.com') && !url.endsWith('/exec')) {
-        if (url.endsWith('/')) url = url.slice(0, -1);
-        if (url.endsWith('/edit')) url = url.replace('/edit', '/exec');
-        if (!url.endsWith('/exec')) url += '/exec';
-        urlInput.value = url; // Atualiza no campo visualmente
-    }
-
-    if (!url.startsWith('https://script.google.com')) {
-        if (!silent) alert('A URL parece inválida. Ela deve começar com https://script.google.com');
-        updateSyncStatus('offline', 'Link Inválido');
         return;
     }
 
