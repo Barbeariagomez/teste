@@ -26,9 +26,22 @@ async function initApp() {
     const currentMonth = now.toISOString().substring(0, 7);
     document.getElementById('month-filter').value = currentMonth;
     
-    await loadAttendants(); // Carrega atendentes do banco
-    updateAttendantSelects();
-    await loadEntries(); // Carrega dados do Supabase
+    // Tenta carregar atendentes de forma isolada
+    try {
+        await loadAttendants(); 
+        updateAttendantSelects();
+    } catch (err) {
+        console.warn('Falha ao carregar atendentes. Verifique se a tabela exists:', err);
+    }
+    
+    // Tenta carregar lançamentos de forma isolada
+    try {
+        await loadEntries();
+    } catch (err) {
+        console.error('Falha crítica ao carregar lançamentos:', err);
+    }
+
+    setupRealtime(); // Ativa escuta em tempo real
 }
 
 // Configuração do Real-time
@@ -55,21 +68,33 @@ function setupRealtime() {
 }
 
 async function loadAttendants() {
-    if (!supabaseClient) return;
+    if (!supabaseClient) {
+        updateSyncStatus('offline', 'Biblioteca Supabase não encontrada');
+        return;
+    }
     try {
         const { data, error } = await supabaseClient
             .from('atendentes')
             .select('nome')
             .order('nome', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Erro ao carregar atendentes:', error);
+            if (error.code === '42P01') {
+                updateSyncStatus('offline', 'Rode o SQL de Atendentes!');
+            } else {
+                updateSyncStatus('offline', 'Erro ao acessar Atendentes');
+            }
+            throw error;
+        }
         attendants = data.map(a => a.nome);
         updateAttendantSelects();
         if (document.getElementById('staff-modal').style.display === 'flex') {
             renderStaffList();
         }
+        updateSyncStatus('online');
     } catch (err) {
-        console.error('Erro ao carregar atendentes:', err);
+        console.error('Erro fatal loadAttendants:', err);
     }
 }
 
