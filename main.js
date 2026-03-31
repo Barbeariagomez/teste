@@ -11,7 +11,7 @@ const supabaseClient = (typeof supabase !== 'undefined') ? supabase.createClient
 
 // Gerenciamento de Estado e Dados
 let entries = [];
-let attendants = JSON.parse(localStorage.getItem('gomez_club_attendants')) || ['Ana', 'Julia', 'Beatriz'];
+let attendants = [];
 let charts = {};
 
 // Inicialização
@@ -26,6 +26,7 @@ async function initApp() {
     const currentMonth = now.toISOString().substring(0, 7);
     document.getElementById('month-filter').value = currentMonth;
     
+    await loadAttendants(); // Carrega atendentes do banco
     updateAttendantSelects();
     await loadEntries(); // Carrega dados do Supabase
 }
@@ -33,13 +34,43 @@ async function initApp() {
 // Configuração do Real-time
 function setupRealtime() {
     if (!supabaseClient) return;
+    
+    // Canal para Lançamentos
     supabaseClient
         .channel('public:lancamentos')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, (payload) => {
-            console.log('Mudança detectada no banco:', payload);
-            loadEntries(); // Recarrega tudo para manter consistência
+            console.log('Mudança detectada nos lançamentos:', payload);
+            loadEntries();
         })
         .subscribe();
+
+    // Canal para Atendentes
+    supabaseClient
+        .channel('public:atendentes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'atendentes' }, (payload) => {
+            console.log('Mudança detectada nos atendentes:', payload);
+            loadAttendants();
+        })
+        .subscribe();
+}
+
+async function loadAttendants() {
+    if (!supabaseClient) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('atendentes')
+            .select('nome')
+            .order('nome', { ascending: true });
+
+        if (error) throw error;
+        attendants = data.map(a => a.nome);
+        updateAttendantSelects();
+        if (document.getElementById('staff-modal').style.display === 'flex') {
+            renderStaffList();
+        }
+    } catch (err) {
+        console.error('Erro ao carregar atendentes:', err);
+    }
 }
 
 async function loadEntries() {
@@ -165,15 +196,20 @@ function setupEventListeners() {
     const saveStaff = document.getElementById('save-staff-btn');
     if (saveStaff) saveStaff.addEventListener('click', () => staffModal.style.display = 'none');
     
-    document.getElementById('add-staff-btn').addEventListener('click', () => {
+    document.getElementById('add-staff-btn').addEventListener('click', async () => {
         const nameInput = document.getElementById('new-staff-name');
         const name = nameInput.value.trim();
         if (name && !attendants.includes(name)) {
-            attendants.push(name);
-            localStorage.setItem('gomez_club_attendants', JSON.stringify(attendants));
-            nameInput.value = '';
-            renderStaffList();
-            updateAttendantSelects();
+            try {
+                const { error } = await supabaseClient
+                    .from('atendentes')
+                    .insert([{ nome: name }]);
+                if (error) throw error;
+                nameInput.value = '';
+            } catch (err) {
+                console.error('Erro ao adicionar atendente:', err);
+                alert('Erro ao cadastrar atendente.');
+            }
         }
     });
 
@@ -203,12 +239,19 @@ function renderStaffList() {
     });
 }
 
-window.removeStaff = function(index) {
-    if (confirm(`Remover ${attendants[index]} da equipe?`)) {
-        attendants.splice(index, 1);
-        localStorage.setItem('gomez_club_attendants', JSON.stringify(attendants));
-        renderStaffList();
-        updateAttendantSelects();
+window.removeStaff = async function(index) {
+    const name = attendants[index];
+    if (confirm(`Remover ${name} da equipe?`)) {
+        try {
+            const { error } = await supabaseClient
+                .from('atendentes')
+                .delete()
+                .eq('nome', name);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Erro ao remover:', err);
+            alert('Não foi possível remover o atendente.');
+        }
     }
 };
 
