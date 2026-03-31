@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="dark-theme">
     <nav class="sidebar">
@@ -28,16 +29,13 @@
             <li class="nav-divider"></li>
             <li class="settings-group">
                 <label>Nuvem Gomez Club</label>
-                <input type="password" id="sync-url" placeholder="URL de Sincronização..." class="glass-input small">
-                <button id="sync-now-btn" class="secondary-btn">Sincronizar Agora</button>
-                
-                <label style="margin-top: 1rem;">Equipe</label>
-                <button id="manage-staff-btn" class="secondary-btn">Configurar Atendentes</button>
-                
                 <div id="cloud-status-indicator" class="status-badge offline">
                     <span class="dot"></span>
                     <span class="status-text">Desconectado</span>
                 </div>
+                
+                <label style="margin-top: 1rem;">Equipe</label>
+                <button id="manage-staff-btn" class="secondary-btn">Configurar Atendentes</button>
             </li>
         </ul>
         <div class="user-profile">
