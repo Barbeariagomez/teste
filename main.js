@@ -1,7 +1,13 @@
 // Supabase Configuration
 const SUPABASE_URL = 'https://ufoogmuszlkrgjctezru.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmb29nbXVzemxrcmdqY3RlenJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MTcxMzEsImV4cCI6MjA5MDQ5MzEzMX0.6M2GsqYccXdLh3rHY2FKsOimUiKhIUss2nxRWrRDYq4';
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Check if supabase library is loaded correctly
+if (typeof supabase === 'undefined') {
+    console.error('Erro: A biblioteca Supabase não foi carregada. Verifique se o script no index.html está correto.');
+}
+
+const supabaseClient = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 // Gerenciamento de Estado e Dados
 let entries = [];
@@ -26,7 +32,8 @@ async function initApp() {
 
 // Configuração do Real-time
 function setupRealtime() {
-    supabase
+    if (!supabaseClient) return;
+    supabaseClient
         .channel('public:lancamentos')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, (payload) => {
             console.log('Mudança detectada no banco:', payload);
@@ -36,14 +43,22 @@ function setupRealtime() {
 }
 
 async function loadEntries() {
+    if (!supabaseClient) return;
     updateSyncStatus('syncing');
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('lancamentos')
             .select('*')
             .order('data', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            if (error.code === '42P01') {
+                updateSyncStatus('offline', 'Tabela Faltando');
+            } else {
+                updateSyncStatus('offline', 'Erro de API');
+            }
+            throw error;
+        }
 
         // Mapeia do banco para o padrão do JS
         entries = data.map(db => ({
@@ -205,6 +220,10 @@ function closeModal() {
 }
 
 async function saveEntry() {
+    if (!supabaseClient) {
+        alert('O sistema está offline. Recarregue a página.');
+        return;
+    }
     updateSyncStatus('syncing');
     const newEntry = {
         id: Date.now(),
@@ -221,26 +240,33 @@ async function saveEntry() {
     };
 
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('lancamentos')
             .insert([newEntry]);
 
-        if (error) throw error;
+        if (error) {
+            console.error('Erro no Supabase:', error);
+            if (error.code === '42P01') {
+                alert('ERRO: A tabela "lancamentos" não existe no Supabase. Você rodou o script SQL no SQL Editor?');
+            } else {
+                alert('Erro ao salvar no banco: ' + error.message);
+            }
+            throw error;
+        }
         
         closeModal();
-        // Não precisamos de loadEntries aqui porque o Real-time vai detectar a mudança
     } catch (err) {
-        console.error('Erro ao salvar no Supabase:', err);
-        alert('Erro ao salvar dados na nuvem. Verifique sua conexão.');
-        updateSyncStatus('offline');
+        console.error('Erro ao salvar:', err);
+        updateSyncStatus('offline', 'Erro ao Salvar');
     }
 }
 
 window.deleteEntry = async function(id) {
+    if (!supabaseClient) return;
     if (confirm('Deseja excluir este lançamento?')) {
         updateSyncStatus('syncing');
         try {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('lancamentos')
                 .delete()
                 .eq('id', id);
